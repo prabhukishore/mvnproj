@@ -1,0 +1,219 @@
+Install Java
+We will be using open java for our demo, Get latest version from http://openjdk.java.net/install/
+
+yum install java-1.8*
+#yum -y install java-1.8.0-openjdk
+Confirm Java Version
+Lets install java and set the java home
+
+java -version
+find /usr/lib/jvm/java-1.8* | head -n 3
+#JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk-1.8.0.191.b12-1.el7_6.x86_64
+export JAVA_HOME
+PATH=$PATH:$JAVA_HOME
+# To set it permanently update your .bash_profile
+source ~/.bash_profile
+The output should be something like this,
+
+[root@~]# java -version
+openjdk version "1.8.0_151"
+OpenJDK Runtime Environment (build 1.8.0_151-b12)
+OpenJDK 64-Bit Server VM (build 25.151-b12, mixed mode)
+Install Jenkins
+You can install jenkins using the rpm or by setting up the repo. We will setup the repo so that we can update it easily in future. Get latest version of jenkins from https://pkg.jenkins.io/redhat-stable/
+
+yum -y install wget
+wget -O /etc/yum.repos.d/jenkins.repo https://pkg.jenkins.io/redhat-stable/jenkins.repo
+rpm --import https://pkg.jenkins.io/redhat-stable/jenkins.io.key
+yum -y install jenkins
+Start Jenkins
+# Start jenkins service
+systemctl start jenkins
+
+# Setup Jenkins to start at boot,
+systemctl enable jenkins
+Accessing Jenkins
+By default jenkins runs at port 8080, You can access jenkins at
+
+http://YOUR-SERVER-PUBLIC-IP:8080
+Configure Jenkins
+The default Username is admin
+Grab the default password
+Password Location:/var/lib/jenkins/secrets/initialAdminPassword
+Skip Plugin Installation; We can do it later
+Change admin password
+Admin > Configure > Password
+Configure java path
+Manage Jenkins > Global Tool Configuration > JDK
+Create another admin user id
+
+Install Git on Jenkins server
+Install git packages on jenkins server
+
+  yum install git -y
+Setup Git on jenkins console
+Install git plugin without restart
+
+Manage Jenkins > Jenkins Plugins > available > github
+Configure git path
+
+Manage Jenkins > Global Tool Configuration > git
+=======================================================================================
+Install Maven on Jenkins
+Download maven packages https://maven.apache.org/download.cgi onto Jenkins server. In this case I am using /opt/maven as my installation directory - Link : https://maven.apache.org/download.cgi
+
+  # Creating maven directory under /opt
+  mkdir /opt/maven
+  cd /opt/maven
+  # downloading maven version 3.6.0
+  wget http://mirrors.fibergrid.in/apache/maven/maven-3/3.6.0/binaries/apache-maven-3.6.0-bin.zip
+  unzip /opt/maven/apache-maven-3.6.0-bin.zip
+Setup M2_HOME and M2 paths in .bash_profile of user and add these to path variable
+
+  vi ~/.bash_profile
+  M2_HOME=/opt/maven/apache-maven-3.6.0
+  M2=$M2_HOME/bin
+  PAHT=<Existing_PATH>:$M2_HOME:$M2
+Check point
+logoff and login to check maven version Check maven version
+
+  mvn –version
+So far you have completed installation of maven software to support maven plugin on jenkins console. Let's jump onto jenkins to complete remining steps.
+
+Setup maven on jenkins console
+Install maven plugin without restart
+
+Manage Jenkins > Jenkins Plugins > available > Maven Invoker
+Configure java path
+
+Manage Jenkins > Global Tool Configuration > Maven
+==============================================================================
+Installation steps:
+Add a EPEL (Extra Packages for Enterprise Linux)third party repository to get packages for Ansible
+
+rpm -Uvh https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
+Install Ansible
+
+yum install ansible -y 
+Check Ansible version
+
+ansible --version
+Create a new user for ansible administration & grant admin access to user (Master and Slave)
+
+useradd ansadmin
+passwd ansadmin
+# below command addes ansadmin to sudoers file. But strongly recommended to use "visudo" command if you are aware vi or nano editor. 
+echo "ansadmin ALL=(ALL) ALL" >> /etc/sudoers
+=====================================================================================================
+Install Apache Tomcat
+Download tomcat packages from https://tomcat.apache.org/download-80.cgi onto /opt on EC2 instance
+
+  # create tomcat directory
+  cd /opt
+  wget http://mirrors.fibergrid.in/apache/tomcat/tomcat-8/v8.5.35/bin/apache-tomcat-8.5.35.tar.gz
+  tar -xvzf /opt/apache-tomcat-8.5.35.tar.gz
+give executing permissions to startup.sh and shutdown.sh which are under bin.
+
+   chmod +x /opt/apache-tomcat-8.5.35/bin/startup.sh shutdown.sh
+create link files for tomcat startup.sh and shutdown.sh
+
+  ln -s /opt/apache-tomcat-8.5.35/bin/startup.sh /usr/local/bin/tomcatup
+  ln -s /opt/apache-tomcat-8.5.35/bin/shutdown.sh /usr/local/bin/tomcatdown
+  tomcatup
+check point :
+access tomcat application from browser on prot 8080
+http://<Public_IP>:8080
+
+================================================================================================
+
+Steps to create Jenkin job
+Login to Jenkins console
+Create Jenkins job, Fill the following details,
+Source Code Management:
+Repository: 
+Branches to build : */master
+Build:
+Root POM:pom.xml
+Goals and options : clean install package
+Part-02: Adding Deployment Steps
+in this port we are going to install 'deploy to container' plugin. this is need to deploy on tomcat server which we are using.
+
+Install maven plugin without restart
+Manage Jenkins > Jenkins Plugins > available > deploy to container
+To deploy our build artifacts on tomcat server our Jenkins server need access. For this we should setup credentials. This option is available in Jenkins home page
+
+setup credentials
+credentials > jenkins > Global credentials > add credentials
+Username	: deployer
+Password : XXXXXXX
+id : Tomcat_user
+Description: Tomcat user to deploy on tomcat server
+Modify the same job which created in part-01 and add deployment steps.
+
+Post Steps
+Deploy war/ear to container
+WAR/EAR files : **/*.war
+Containers : Tomcat 8.x
+Credentials: Tomcat_user (which created in above step)
+Tomcat URL : http://<PUBLIC_IP>:<PORT_NO>
+Save and run the job now.
+
+Port-03 : Continuous Integration & Continuous Deployment (CI/CD)
+Now job is running fine but to make this as Continuous Integration and Continuous Deployment Tod do that go back and modify job as below.
+
+Build Triggers
+Poll SCM
+schedule */2 * * * *
+Save the job 
+=========================================================================================================
+Install "publish Over SSH"
+
+Manage Jenkins > Manage Plugins > Available > Publish over SSH
+Enable connection between Ansible and Jenkins
+
+Manage Jenkins > Configure System > Publish Over SSH > SSH Servers
+
+SSH Servers:
+Hostname:<ServerIP>
+username: ansadm
+password: *******
+Test the connection "Test Connection"
+
+Part-02 - Execute job to connect
+create a copywarfile.yml on Ansible under /opt/playbooks
+
+# copywarfile.yml
+---
+- hosts: all 
+  become: true
+  tasks: 
+    - name: copy jar/war onto tomcat servers
+        copy:
+          src: /op/playbooks/wabapp/target/webapp.war
+          dest: /opt/apache-tomcat-8.5.32/webapps
+Add tomcat server details to /etc/ansible/hosts (if you are using other hosts file update server info there)
+
+echo "<server_IP>" >> /etc/ansible/hosts
+Create Jenkins job, Fill the following details,
+
+Source Code Management:
+
+Repository: https://github.com/ValaxyTech/hello-world.git
+Branches to build : */master
+Build:
+
+Root POM:pom.xml
+Goals and options : clean install package
+Add post-build steps
+
+Send files or execute commands over SSH
+SSH Server : ansible_server
+Source fiels: webapp/target/*.war
+Remote directory: //opt//playbooks
+Add post-build steps
+
+Send files or execute commands over ssH
+SSH Server : ansible_server
+Exec command ansible-playbook /opt/playbooks/copywarfile.yml
+Execute job and you should be able to seen build has been deployed on Tomcat server.
+===================================================================================================
