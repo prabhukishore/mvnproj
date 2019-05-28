@@ -130,7 +130,7 @@ Steps to create Jenkin job
 Login to Jenkins console
 Create Jenkins job, Fill the following details,
 Source Code Management:
-Repository: 
+Repository: https://github.com/prabhukishore/mvnproj.git
 Branches to build : */master
 Build:
 Root POM:pom.xml
